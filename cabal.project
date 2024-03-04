@@ -5,4 +5,4 @@ source-repository-package
 
 packages:
     copilot-rust
-    copilot-rust-test
+    example-spec
