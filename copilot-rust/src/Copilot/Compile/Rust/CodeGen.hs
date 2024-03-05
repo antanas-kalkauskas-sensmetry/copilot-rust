@@ -26,6 +26,7 @@ module Copilot.Compile.Rust.CodeGen
     , mkInputStruct
     , mkStateStruct
     , mkStateStructDefault
+    , mkAccessDeclnR
     )
   where
 
@@ -50,7 +51,7 @@ import Copilot.Compile.Rust.Name     ( argNames, argTempNames, generatorName,
                                       streamName )
 import Copilot.Compile.Rust.Settings ( CSettings, cSettingsStepFunctionName )
 import Copilot.Compile.Rust.Type     ( transType, transTypeR )
-import GHC.Float (double2Float, float2Double)
+import GHC.Float ( float2Double )
 
 -- * Externs
 
@@ -467,3 +468,44 @@ mkStateStructDefault streams =
       (map (\x -> Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.Unsuffixed ()) ()) xs)
       ()
     mkArrayLiteral _ _ = error "not implemented" -- TODO
+
+
+mkVariableReference :: String -> Rust.Expr ()
+mkVariableReference ident = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (mkIdent ident) Nothing ()] ()) ()
+
+-- | Define an accessor functions for the ring buffer associated with a stream.
+mkAccessDeclnR :: Stream -> Rust.Item ()
+mkAccessDeclnR (Stream sId buff _ ty) =
+  Rust.Fn
+    []
+    Rust.InheritedV
+    (mkIdent name)
+    (Rust.FnDecl [mkImmutableRefArg (mkType "MonitorState") "state", mkImmutableArg (mkType "usize") "index"]
+    (Just rustTy) False ())
+    Rust.Normal
+    Rust.NotConst
+    Rust.Rust
+    (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
+    (Rust.Block
+      [Rust.NoSemi expr ()]
+      Rust.Normal
+      ())
+    ()
+  
+  -- C.FunDef cTy name params [] [C.Return (Just expr)]
+  where
+    indexSum = Rust.Binary [] Rust.AddOp (mkVariableReference "index") (mkVariableReference (indexName sId)) ()
+    index      = Rust.Binary [] Rust.RemOp indexSum (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed () ) ()) ()
+    expr = Rust.Index [] (Rust.FieldAccess [] (mkVariableReference "state") (mkIdent (streamName sId)) ()) index ()
+    rustTy        = transTypeR ty
+    name       = streamAccessorName sId
+
+
+mkType :: String -> Rust.Ty ()
+mkType x = Rust.PathTy Nothing (Rust.Path False [Rust.PathSegment (mkIdent x) Nothing ()] ()) ()
+
+mkImmutableArg :: Rust.Ty () -> String -> Rust.Arg ()
+mkImmutableArg ty ident = Rust.Arg (Just (Rust.IdentP (Rust.ByValue Rust.Immutable) (mkIdent ident) Nothing ())) ty ()
+
+mkImmutableRefArg :: Rust.Ty () -> String -> Rust.Arg ()
+mkImmutableRefArg ty ident = Rust.Arg (Just (Rust.RefP (Rust.IdentP (Rust.ByValue Rust.Immutable) (mkIdent ident) Nothing ()) Rust.Immutable ())) ty ()
