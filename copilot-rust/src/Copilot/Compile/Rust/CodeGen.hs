@@ -25,6 +25,7 @@ module Copilot.Compile.Rust.CodeGen
     , mkTriggerTrait
     , mkInputStruct
     , mkStateStruct
+    , mkStateStructDefault
     )
   where
 
@@ -49,6 +50,7 @@ import Copilot.Compile.Rust.Name     ( argNames, argTempNames, generatorName,
                                       streamName )
 import Copilot.Compile.Rust.Settings ( CSettings, cSettingsStepFunctionName )
 import Copilot.Compile.Rust.Type     ( transType, transTypeR )
+import GHC.Float (double2Float, float2Double)
 
 -- * Externs
 
@@ -409,3 +411,59 @@ mkStateStruct streams =
     ()
   where
     fields = map mkBuffDeclnR streams ++ map mkIndexDeclnR streams
+
+mkStateStructDefault :: [Stream] -> Rust.Item ()
+mkStateStructDefault streams =
+  Rust.Impl []
+  Rust.InheritedV
+  Rust.Default
+  Rust.Normal
+  Rust.Positive
+  (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
+  (Just (Rust.TraitRef (Rust.Path False [Rust.PathSegment (mkIdent "Default") Nothing ()] ())))
+  (Rust.PathTy Nothing (Rust.Path False [Rust.PathSegment (mkIdent "MonitorState") Nothing ()] ()) ())
+  [defaultFun]
+  ()
+  where
+    defaultFun = Rust.MethodI
+      []
+      Rust.InheritedV
+      Rust.Final
+      (mkIdent "default")
+      (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
+      (Rust.MethodSig Rust.Normal Rust.NotConst Rust.Rust (Rust.FnDecl [] (Just (Rust.PathTy Nothing (Rust.Path False [Rust.PathSegment (mkIdent "Self") Nothing ()] ()) ())) False ()))
+      (Rust.Block [
+        Rust.NoSemi
+        (Rust.Struct [] (Rust.Path False [Rust.PathSegment (mkIdent "Self") Nothing ()] ())
+        (initIndices++initBuffers)
+        Nothing
+        ())
+        ()
+      ]
+      Rust.Normal
+      ()
+      )
+      ()
+    initIndices = map mkInitIndexField streams
+    initBuffers = map mkInitBufferField streams
+
+    mkInitIndexField (Stream sId buff _ ty) = Rust.Field (mkIdent (streamName sId ++ "_index")) (Just $ Rust.Lit [] (Rust.Int Rust.Dec 0 Rust.Unsuffixed ()) ()) ()
+    mkInitBufferField (Stream sId buff expr ty) = Rust.Field (mkIdent (streamName sId)) (Just $ mkArrayLiteral ty buff) ()
+    -- TODO: move this to Expr and complete it
+    mkArrayLiteral :: Type a -> [a] -> Rust.Expr ()
+    mkArrayLiteral Float xs =
+      Rust.Vec
+      []
+      (map (\x -> Rust.Lit [] (Rust.Float (float2Double x) Rust.Unsuffixed ()) ()) xs)
+      ()
+    mkArrayLiteral Double xs =
+      Rust.Vec
+      []
+      (map (\x -> Rust.Lit [] (Rust.Float x Rust.Unsuffixed ()) ()) xs)
+      ()
+    mkArrayLiteral Int32 xs =
+      Rust.Vec
+      []
+      (map (\x -> Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.Unsuffixed ()) ()) xs)
+      ()
+    mkArrayLiteral _ _ = error "not implemented" -- TODO
