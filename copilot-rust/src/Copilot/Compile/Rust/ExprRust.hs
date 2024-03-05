@@ -18,7 +18,7 @@ import Copilot.Core ( Expr (..), Field (..), Op1 (..), Op2 (..), Op3 (..),
 -- Internal imports
 import Copilot.Compile.Rust.Error ( impossible )
 import Copilot.Compile.Rust.Name  ( exCpyName, streamAccessorName )
-import Copilot.Compile.Rust.Type  ( transLocalVarDeclType, transTypeName )
+import Copilot.Compile.Rust.Type  ( transLocalVarDeclType, transTypeName, transTypeR )
 
 -- import qualified Core as Copilot
 import GHC.Float (float2Double)
@@ -59,7 +59,7 @@ transExpr (Var _ name) = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSeg
 -- transExpr (ExternVar {}) = error "not supported" -- TODO
 transExpr (ExternVar _ name _) = Rust.FieldAccess [] inputStruct (Rust.mkIdent name) ()
   where
-    inputStruct = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent name) Nothing ()] ()) ()
+    inputStruct = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent "input") Nothing ()] ()) ()
 
 -- Op1 expressions
 transExpr (Op1 Not x) = Rust.Unary [] Rust.Not (transExpr x) ()
@@ -84,7 +84,7 @@ transExpr (Op1 (Acosh _) _) = error "not supported" -- TODO
 transExpr (Op1 (Ceiling _) _) = error "not supported" -- TODO
 transExpr (Op1 (Floor _) _) = error "not supported" -- TODO
 transExpr (Op1 (BwNot _) _) = error "not supported" -- TODO
-transExpr (Op1 (Cast _ _) _) = error "not supported" -- TODO
+transExpr (Op1 (Cast ty1 ty2) expr) = Rust.Cast [] (transExpr expr) (transTypeR ty2) ()
 transExpr (Op1 (GetField {}) _) = error "not supported" -- TODO
 
 -- Op2 expressions
@@ -95,7 +95,7 @@ transExpr (Op2 (Sub _) x y) = translateBinaryOp x y Rust.SubOp
 transExpr (Op2 (Mul _) x y) = translateBinaryOp x y Rust.MulOp
 transExpr (Op2 (Mod _) x y) = translateBinaryOp x y Rust.RemOp
 transExpr (Op2 (Div _) x y) = translateBinaryOp x y Rust.DivOp
-transExpr (Op2 (Fdiv _) _ _) = error "not supported" -- TODO
+transExpr (Op2 (Fdiv _) x y) = translateBinaryOp x y Rust.DivOp
 transExpr (Op2 (Pow _) _ _) = error "not supported" -- TODO
 transExpr (Op2 (Logb _) _ _) = error "not supported" -- TODO
 transExpr (Op2 (Atan2 _) _ _) = error "not supported" -- TODO

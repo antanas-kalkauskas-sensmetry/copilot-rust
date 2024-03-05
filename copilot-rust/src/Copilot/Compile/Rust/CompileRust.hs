@@ -1,20 +1,24 @@
+{-# LANGUAGE GADTs #-}
+
 module Copilot.Compile.Rust.CompileRust
   ( translateTriggers
   , mkStep
   ) where
 
-import qualified Copilot.Core as Copilot
-import qualified Copilot.Core.Spec as Copilot
+import Copilot.Core ( Expr (..), Spec (..), Stream (..), Struct (..),
+                      Trigger (..), Type (..), UExpr (..), UType (..),
+                      Value (..) )
+-- import qualified Core.Spec as Copilot
 import qualified Language.Rust.Syntax as Rust
 import qualified Language.Rust.Data.Ident as Rust
-import Copilot.Compile.Rust.ExprRust
 import Copilot.Compile.Rust.Type
+import Copilot.Compile.Rust.ExprRust
 
-translateTriggers :: [Copilot.Trigger] -> [Rust.Item ()]
+translateTriggers :: [Trigger] -> [Rust.Item ()]
 translateTriggers = concatMap translateTrigger
 
-translateTrigger :: Copilot.Trigger -> [Rust.Item ()]
-translateTrigger trigger@(Copilot.Trigger _ _ args) = guardFn : triggerFns
+translateTrigger :: Trigger -> [Rust.Item ()]
+translateTrigger trigger@(Trigger _ _ args) = guardFn : triggerFns
     where
         guardFn = mkTriggerGuardFn trigger
         triggerFns = zipWith mkTriggerArgFn (mkTriggerArgNames trigger) args
@@ -31,18 +35,18 @@ mkImmutableRefArg ty ident = Rust.Arg (Just (Rust.RefP (Rust.IdentP (Rust.ByValu
 mkMutableRefArg :: Rust.Ty () -> String -> Rust.Arg ()
 mkMutableRefArg ty ident = Rust.Arg (Just (Rust.RefP (Rust.IdentP (Rust.ByValue Rust.Mutable) (Rust.mkIdent ident) Nothing ()) Rust.Immutable ())) ty ()
 
-mkTriggerGuardName :: Copilot.Trigger -> String
-mkTriggerGuardName (Copilot.Trigger name _ _) = name ++ "_guard"
+mkTriggerGuardName :: Trigger -> String
+mkTriggerGuardName (Trigger name _ _) = name ++ "_guard"
 
-mkTriggerArgNames :: Copilot.Trigger -> [String]
-mkTriggerArgNames (Copilot.Trigger name _ args) =
+mkTriggerArgNames :: Trigger -> [String]
+mkTriggerArgNames (Trigger name _ args) =
     zipWith
         (++)
         (replicate (length args) name)
         (map (\x -> "_arg" ++ show x) [0 .. length args])
 
-mkTriggerGuardFn :: Copilot.Trigger -> Rust.Item ()
-mkTriggerGuardFn trigger@(Copilot.Trigger _ guard _) =
+mkTriggerGuardFn :: Trigger -> Rust.Item ()
+mkTriggerGuardFn trigger@(Trigger _ guard _) =
     Rust.Fn
         []
         Rust.InheritedV
@@ -55,8 +59,8 @@ mkTriggerGuardFn trigger@(Copilot.Trigger _ guard _) =
         (mkReturnBlock $ transExpr guard)
         ()
 
-mkTriggerArgFn :: String -> Copilot.UExpr -> Rust.Item ()
-mkTriggerArgFn name (Copilot.UExpr ty e) = 
+mkTriggerArgFn :: String -> UExpr -> Rust.Item ()
+mkTriggerArgFn name (UExpr ty e) = 
     Rust.Fn
         []
         Rust.InheritedV
@@ -75,8 +79,8 @@ mkReturnBlock e = Rust.Block [ Rust.Semi (Rust.Ret [] (Just e) ()) () ] Rust.Nor
 mkIf :: Rust.Expr () -> Rust.Block () -> Rust.Expr ()
 mkIf predicate consequent = Rust.If [] predicate consequent Nothing ()
 
-mkTriggerRunnerExpr :: Copilot.Trigger -> Rust.Expr ()
-mkTriggerRunnerExpr trigger@(Copilot.Trigger name _ _) =
+mkTriggerRunnerExpr :: Trigger -> Rust.Expr ()
+mkTriggerRunnerExpr trigger@(Trigger name _ _) =
     Rust.If
         []
         triggerGuardCallExpr
@@ -88,8 +92,8 @@ mkTriggerRunnerExpr trigger@(Copilot.Trigger name _ _) =
         triggerCallExpr = Rust.Call [] (Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent name) Nothing ()] ()) ()) triggerCallArgs ()
         triggerCallArgs = map (\x -> Rust.Call [] (Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent x) Nothing ()] ()) ()) [] ()) (mkTriggerArgNames trigger)
 
-mkStep :: Copilot.Spec -> Rust.Item ()
-mkStep (Copilot.Spec _ _ triggers _) = 
+mkStep :: Spec -> Rust.Item ()
+mkStep (Spec _ _ triggers _) = 
     Rust.Fn
         []
         Rust.InheritedV
