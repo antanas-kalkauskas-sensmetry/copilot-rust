@@ -3,6 +3,7 @@
 module Copilot.Compile.Rust.CompileRust
   ( translateTriggers
   , mkStep
+  , mkGenerators
   ) where
 
 import Copilot.Core ( Expr (..), Spec (..), Stream (..), Struct (..),
@@ -13,6 +14,8 @@ import qualified Language.Rust.Syntax as Rust
 import qualified Language.Rust.Data.Ident as Rust
 import Copilot.Compile.Rust.Type
 import Copilot.Compile.Rust.ExprRust
+import Copilot.Compile.Rust.Name (generatorName, streamName, indexName)
+-- import Copilot.Compile.Rust.Name (generatorOutputArgName)
 
 translateTriggers :: [Trigger] -> [Rust.Item ()]
 translateTriggers = concatMap translateTrigger
@@ -22,6 +25,14 @@ translateTrigger trigger@(Trigger _ _ args) = guardFn : triggerFns
     where
         guardFn = mkTriggerGuardFn trigger
         triggerFns = zipWith mkTriggerArgFn (mkTriggerArgNames trigger) args
+
+mkGenerators :: [Stream] -> [Rust.Item ()]
+mkGenerators = concatMap mkGenerator
+
+mkGenerator :: Stream -> [Rust.Item ()]
+mkGenerator (Stream sId _ expr ty) = [genFun]
+    where
+        genFun = mkTriggerArgFn (generatorName sId) (UExpr ty expr)
 
 mkType :: String -> Rust.Ty ()
 mkType x = Rust.PathTy Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent x) Nothing ()] ()) ()
@@ -92,8 +103,12 @@ mkTriggerRunnerExpr trigger@(Trigger name _ _) =
         triggerCallExpr = Rust.Call [] (Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent name) Nothing ()] ()) ()) triggerCallArgs ()
         triggerCallArgs = map (\x -> Rust.Call [] (Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent x) Nothing ()] ()) ()) [] ()) (mkTriggerArgNames trigger)
 
+
+mkVariableReference :: String -> Rust.Expr ()
+mkVariableReference ident = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent ident) Nothing ()] ()) ()
+
 mkStep :: Spec -> Rust.Item ()
-mkStep (Spec _ _ triggers _) = 
+mkStep spec@(Spec _ _ triggers _) = 
     Rust.Fn
         []
         Rust.InheritedV
@@ -103,5 +118,28 @@ mkStep (Spec _ _ triggers _) =
         Rust.NotConst
         Rust.Rust
         (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
-        (Rust.Block (map (\x -> Rust.Semi (mkTriggerRunnerExpr x) ()) triggers) Rust.Normal ())
+        (Rust.Block (map (\x -> Rust.Semi (mkTriggerRunnerExpr x) ()) triggers ++ temps ++ buffUpdates ++ indexUpdates) Rust.Normal ())
         ()
+    where
+        (temps, buffUpdates, indexUpdates) = unzip3 (map mkUpdateGlobalsR streams)
+        streams = specStreams spec
+        mkUpdateGlobalsR :: Stream -> (Rust.Stmt (), Rust.Stmt (), Rust.Stmt ())
+        mkUpdateGlobalsR (Stream sId buff _expr ty) =
+            (tmpDcln, bufferUpdate, indexUpdate)
+                where
+                tmpDcln = Rust.Local (Rust.IdentP (Rust.ByValue Rust.Immutable) (Rust.mkIdent tmpVar) Nothing ()) (Just rustTy) (Just tmpExpr) [] ()
+                tmpExpr = Rust.Call [] (mkVariableReference $ generatorName sId) [] ()
+
+                bufferUpdate = Rust.Semi
+                    (Rust.Assign [] bufferVar (mkVariableReference tmpVar) ()) ()
+
+                indexUpdate = Rust.Semi
+                    (Rust.Assign [] indexVar newIndex ()) ()
+
+                tmpVar   = streamName sId ++ "_tmp"
+                bufferVar = Rust.Index [] (Rust.FieldAccess [] (mkVariableReference "state") (Rust.mkIdent $ streamName sId) ()) indexVar ()
+                indexVar = Rust.FieldAccess [] (mkVariableReference "state") (Rust.mkIdent (indexName sId)) ()
+                incrementedIndex = Rust.Binary [] Rust.AddOp indexVar (Rust.Lit [] (Rust.Int Rust.Dec 1 Rust.Unsuffixed ()) ()) ()
+                newIndex = Rust.Binary [] Rust.RemOp incrementedIndex (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed ()) ()) ()
+                -- val      = C.Funcall (C.Ident $ generatorName sId) []
+                rustTy      = transTypeR ty
