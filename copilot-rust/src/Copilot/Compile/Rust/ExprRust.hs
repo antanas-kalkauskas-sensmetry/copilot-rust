@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
-module Compile.Rust.Expr
+module Copilot.Compile.Rust.ExprRust
     ( transExpr
     -- , constArray
     )
