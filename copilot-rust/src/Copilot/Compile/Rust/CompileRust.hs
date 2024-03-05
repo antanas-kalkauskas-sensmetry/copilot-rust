@@ -1,14 +1,23 @@
-import qualified Copilot.Core as Copilot
-import qualified Copilot.Core.Spec as Copilot
+{-# LANGUAGE GADTs #-}
+
+module Copilot.Compile.Rust.CompileRust
+  ( translateTriggers
+  ) where
+
+import Copilot.Core ( Expr (..), Spec (..), Stream (..), Struct (..),
+                      Trigger (..), Type (..), UExpr (..), UType (..),
+                      Value (..) )
+-- import qualified Core.Spec as Copilot
 import qualified Language.Rust.Syntax as Rust
 import qualified Language.Rust.Data.Ident as Rust
 import Copilot.Compile.Rust.Type
+import Copilot.Compile.Rust.ExprRust
 
-translateTriggers :: [Copilot.Trigger] -> [Rust.Item ()]
+translateTriggers :: [Trigger] -> [Rust.Item ()]
 translateTriggers = concatMap translateTrigger
 
-translateTrigger :: Copilot.Trigger -> [Rust.Item ()]
-translateTrigger trigger@(Copilot.Trigger _ _ args) = guardFn : triggerFns
+translateTrigger :: Trigger -> [Rust.Item ()]
+translateTrigger trigger@(Trigger _ _ args) = guardFn : triggerFns
     where
         guardFn = mkTriggerGuardFn trigger
         triggerFns = zipWith mkTriggerArgFn (mkTriggerArgNames trigger) args
@@ -22,18 +31,18 @@ mkImmutableArg ty ident = Rust.Arg (Just (Rust.IdentP (Rust.ByValue Rust.Immutab
 mkImmutableRefArg :: Rust.Ty () -> String -> Rust.Arg ()
 mkImmutableRefArg ty ident = Rust.Arg (Just (Rust.RefP (Rust.IdentP (Rust.ByValue Rust.Immutable) (Rust.mkIdent ident) Nothing ()) Rust.Immutable ())) ty ()
 
-mkTriggerGuardName :: Copilot.Trigger -> String
-mkTriggerGuardName (Copilot.Trigger name _ _) = name ++ "_guard"
+mkTriggerGuardName :: Trigger -> String
+mkTriggerGuardName (Trigger name _ _) = name ++ "_guard"
 
-mkTriggerArgNames :: Copilot.Trigger -> [String]
-mkTriggerArgNames (Copilot.Trigger name _ args) =
+mkTriggerArgNames :: Trigger -> [String]
+mkTriggerArgNames (Trigger name _ args) =
     zipWith
         (++)
         (replicate (length args) name)
         (map (\x -> "_arg" ++ show x) [0 .. length args])
 
-mkTriggerGuardFn :: Copilot.Trigger -> Rust.Item ()
-mkTriggerGuardFn trigger@(Copilot.Trigger _ guard _) =
+mkTriggerGuardFn :: Trigger -> Rust.Item ()
+mkTriggerGuardFn trigger@(Trigger _ guard _) =
     Rust.Fn
         []
         Rust.InheritedV
@@ -46,8 +55,8 @@ mkTriggerGuardFn trigger@(Copilot.Trigger _ guard _) =
         (mkReturnBlock $ transExpr guard)
         ()
 
-mkTriggerArgFn :: String -> Copilot.UExpr -> Rust.Item ()
-mkTriggerArgFn name (Copilot.UExpr ty e) = 
+mkTriggerArgFn :: String -> UExpr -> Rust.Item ()
+mkTriggerArgFn name (UExpr ty e) = 
     Rust.Fn
         []
         Rust.InheritedV
