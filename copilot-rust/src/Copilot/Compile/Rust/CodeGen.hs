@@ -24,6 +24,7 @@ module Copilot.Compile.Rust.CodeGen
     , mkStep
     , mkTriggerTrait
     , mkInputStruct
+    , mkStateStruct
     )
   where
 
@@ -384,3 +385,27 @@ mkInputStruct xs = Rust.StructItem
     )
   (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
   ()
+
+
+mkBuffDeclnR :: Stream -> Rust.StructField ()
+mkBuffDeclnR (Stream sId buff _ ty) = 
+  Rust.StructField (Just (mkIdent (streamName sId))) Rust.InheritedV (Rust.Array (transTypeR ty) (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed ()) ()) ()) [] ()
+
+mkIndexDeclnR :: Stream -> Rust.StructField ()
+mkIndexDeclnR (Stream sId buff _ ty) = 
+  Rust.StructField (Just (mkIdent (streamName sId ++ "_idx"))) Rust.InheritedV ( Rust.PathTy Nothing (Rust.Path False [Rust.PathSegment (mkIdent "usize") Nothing ()] ()) ()) [] ()
+
+mkStateStruct :: [Stream] -> Rust.Item ()
+mkStateStruct streams = 
+  Rust.StructItem
+    []
+    (Rust.InheritedV)
+    (mkIdent "MonitorState")
+    (Rust.StructD
+      fields
+      ()
+      )
+    (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
+    ()
+  where
+    fields = map mkBuffDeclnR streams ++ map mkIndexDeclnR streams
