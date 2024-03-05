@@ -22,6 +22,7 @@ module Copilot.Compile.Rust.CodeGen
 
       -- * Monitor processing
     , mkStep
+    ,mkTriggerTrait
     )
   where
 
@@ -30,6 +31,8 @@ import           Control.Monad.State ( runState )
 import           Data.List           ( unzip4 )
 import qualified Data.List.NonEmpty  as NonEmpty
 import qualified Language.C99.Simple as C
+import qualified Language.Rust.Syntax as Rust
+import Language.Rust.Data.Ident
 
 -- Internal imports: Copilot
 import Copilot.Core ( Expr (..), Id, Stream (..), Struct (..), Trigger (..),
@@ -43,7 +46,7 @@ import Copilot.Compile.Rust.Name     ( argNames, argTempNames, generatorName,
                                       guardName, indexName, streamAccessorName,
                                       streamName )
 import Copilot.Compile.Rust.Settings ( CSettings, cSettingsStepFunctionName )
-import Copilot.Compile.Rust.Type     ( transType )
+import Copilot.Compile.Rust.Type     ( transType, transTypeR )
 
 -- * Externs
 
@@ -324,3 +327,42 @@ tyElemName :: Type a -> C.Type
 tyElemName ty = case ty of
   Array ty' -> tyElemName ty'
   _         -> transType ty
+
+
+
+-- * Rust code generation functions
+
+mkTriggerTraitHelper :: Trigger -> Rust.TraitItem ()
+mkTriggerTraitHelper trigger =
+  Rust.MethodT
+    []
+    (mkIdent (triggerName trigger))
+    (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
+    (Rust.MethodSig Rust.Normal Rust.NotConst Rust.Rust
+                (Rust.FnDecl (Rust.SelfRegion Nothing Rust.Mutable () : methods)
+                        Nothing
+                        False ())) 
+    Nothing
+    ()
+  where
+    methods = map mkMethod argsPrep
+    mkMethod (index, ty) = Rust.Arg (Just (Rust.IdentP (Rust.ByValue Rust.Immutable) (mkIdent $ "arg_" ++ show index) Nothing ())) ty ()
+    argsPrep = zip [0, 1..] (map tempType (triggerArgs trigger))
+
+    tempType :: UExpr -> Rust.Ty ()
+    tempType (UExpr { uExprType = ty }) =
+      case ty of
+        Array ty' -> error "Arrays are not supported"
+        _         -> transTypeR ty
+
+mkTriggerTrait :: [Trigger] -> Rust.Item ()
+mkTriggerTrait xs =
+  Rust.Trait
+    []
+    Rust.PublicV
+    (mkIdent "MonitorTriggers")
+    False Rust.Normal
+    (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
+    []
+    (map mkTriggerTraitHelper xs)
+    ()
