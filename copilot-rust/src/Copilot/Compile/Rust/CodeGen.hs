@@ -22,7 +22,8 @@ module Copilot.Compile.Rust.CodeGen
 
       -- * Monitor processing
     , mkStep
-    ,mkTriggerTrait
+    , mkTriggerTrait
+    , mkInputStruct
     )
   where
 
@@ -366,3 +367,20 @@ mkTriggerTrait xs =
     []
     (map mkTriggerTraitHelper xs)
     ()
+
+
+mkInputStructField :: External -> Rust.StructField ()
+mkInputStructField External{ extName = name, extType = ty} =
+  Rust.StructField (Just (mkIdent name)) Rust.PublicV (transTypeR ty) [] ()
+
+mkInputStruct :: [External] -> Rust.Item ()
+mkInputStruct xs = Rust.StructItem
+  []
+  (Rust.PublicV)
+  (mkIdent "MonitorInput")
+  (Rust.StructD
+    (map mkInputStructField xs)
+    ()
+    )
+  (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
+  ()
