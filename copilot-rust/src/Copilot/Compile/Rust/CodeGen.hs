@@ -509,3 +509,24 @@ mkImmutableArg ty ident = Rust.Arg (Just (Rust.IdentP (Rust.ByValue Rust.Immutab
 
 mkImmutableRefArg :: Rust.Ty () -> String -> Rust.Arg ()
 mkImmutableRefArg ty ident = Rust.Arg (Just (Rust.RefP (Rust.IdentP (Rust.ByValue Rust.Immutable) (mkIdent ident) Nothing ()) Rust.Immutable ())) ty ()
+
+mkUpdateGlobalsR :: Stream -> (Rust.Stmt (), Rust.Stmt (), Rust.Stmt ())
+mkUpdateGlobalsR (Stream sId buff _expr ty) =
+  (tmpDcln, bufferUpdate, indexUpdate)
+    where
+      tmpDcln = Rust.Local (Rust.IdentP (Rust.ByValue Rust.Immutable) (mkIdent tmpVar) Nothing ()) (Just rustTy) (Just tmpExpr) [] ()
+      tmpExpr = Rust.Call [] (mkVariableReference $ generatorName sId) [] ()
+
+      bufferUpdate = Rust.Semi
+        (Rust.Assign [] bufferVar (mkVariableReference tmpVar) ()) ()
+
+      indexUpdate = Rust.Semi
+        (Rust.Assign [] indexVar newIndex ()) ()
+
+      tmpVar   = streamName sId ++ "_tmp"
+      bufferVar = Rust.Index [] (Rust.FieldAccess [] (mkVariableReference "state") (mkIdent $ streamName sId) ()) indexVar ()
+      indexVar = Rust.FieldAccess [] (mkVariableReference "state") (mkIdent (indexName sId)) ()
+      incrementedIndex = Rust.Binary [] Rust.AddOp indexVar (Rust.Lit [] (Rust.Int Rust.Dec 1 Rust.Unsuffixed ()) ()) ()
+      newIndex = Rust.Binary [] Rust.RemOp incrementedIndex (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed ()) ()) ()
+      -- val      = C.Funcall (C.Ident $ generatorName sId) []
+      rustTy      = transTypeR ty
