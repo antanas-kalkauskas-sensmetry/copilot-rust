@@ -54,12 +54,9 @@ library
   exposed-modules         : Copilot.Compile.Rust
 
   other-modules          : Copilot.Compile.Rust.Expr
-                         , Copilot.Compile.Rust.Type
-                         , Copilot.Compile.Rust.Error
                          , Copilot.Compile.Rust.Name
-                         , Copilot.Compile.Rust.CodeGen
+                         , Copilot.Compile.Rust.Type
                          , Copilot.Compile.Rust.External
-                         , Copilot.Compile.Rust.Compile
                          , Copilot.Compile.Rust.Settings
-                         , Copilot.Compile.Rust.CompileRust
-                         , Copilot.Compile.Rust.ExprRust
+                         , Copilot.Compile.Rust.Compile
+                         , Copilot.Compile.Rust.CodeGen
