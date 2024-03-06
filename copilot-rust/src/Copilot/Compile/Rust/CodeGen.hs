@@ -26,7 +26,6 @@ module Copilot.Compile.Rust.CodeGen
     , mkInputStruct
     , mkStateStruct
     , mkStateStructDefault
-    , mkAccessDeclnR
     )
   where
 
@@ -417,7 +416,7 @@ mkStateStructDefault :: [Stream] -> Rust.Item ()
 mkStateStructDefault streams =
   Rust.Impl []
   Rust.InheritedV
-  Rust.Default
+  Rust.Final
   Rust.Normal
   Rust.Positive
   (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
@@ -448,7 +447,7 @@ mkStateStructDefault streams =
     initIndices = map mkInitIndexField streams
     initBuffers = map mkInitBufferField streams
 
-    mkInitIndexField (Stream sId buff _ ty) = Rust.Field (mkIdent (streamName sId ++ "_index")) (Just $ Rust.Lit [] (Rust.Int Rust.Dec 0 Rust.Unsuffixed ()) ()) ()
+    mkInitIndexField (Stream sId buff _ ty) = Rust.Field (mkIdent (indexName sId )) (Just $ Rust.Lit [] (Rust.Int Rust.Dec 0 Rust.Unsuffixed ()) ()) ()
     mkInitBufferField (Stream sId buff expr ty) = Rust.Field (mkIdent (streamName sId)) (Just $ mkArrayLiteral ty buff) ()
     -- TODO: move this to Expr and complete it
     mkArrayLiteral :: Type a -> [a] -> Rust.Expr ()
@@ -472,34 +471,6 @@ mkStateStructDefault streams =
 
 mkVariableReference :: String -> Rust.Expr ()
 mkVariableReference ident = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (mkIdent ident) Nothing ()] ()) ()
-
--- | Define an accessor functions for the ring buffer associated with a stream.
-mkAccessDeclnR :: Stream -> Rust.Item ()
-mkAccessDeclnR (Stream sId buff _ ty) =
-  Rust.Fn
-    []
-    Rust.InheritedV
-    (mkIdent name)
-    (Rust.FnDecl [mkImmutableRefArg (mkType "MonitorState") "state", mkImmutableArg (mkType "usize") "index"]
-    (Just rustTy) False ())
-    Rust.Normal
-    Rust.NotConst
-    Rust.Rust
-    (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
-    (Rust.Block
-      [Rust.NoSemi expr ()]
-      Rust.Normal
-      ())
-    ()
-  
-  -- C.FunDef cTy name params [] [C.Return (Just expr)]
-  where
-    indexSum = Rust.Binary [] Rust.AddOp (mkVariableReference "index") (mkVariableReference (indexName sId)) ()
-    index      = Rust.Binary [] Rust.RemOp indexSum (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed () ) ()) ()
-    expr = Rust.Index [] (Rust.FieldAccess [] (mkVariableReference "state") (mkIdent (streamName sId)) ()) index ()
-    rustTy        = transTypeR ty
-    name       = streamAccessorName sId
-
 
 mkType :: String -> Rust.Ty ()
 mkType x = Rust.PathTy Nothing (Rust.Path False [Rust.PathSegment (mkIdent x) Nothing ()] ()) ()

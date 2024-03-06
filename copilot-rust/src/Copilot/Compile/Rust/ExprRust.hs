@@ -43,11 +43,12 @@ transExpr (Const (Array _) _) = error "not supported" -- TODO
 transExpr (Const (Struct _) _) = error "not supported" -- TODO
 
 transExpr (Drop _ amount sId) =
-  Rust.Call [] functionName [index] ()
+  Rust.Call [] functionName [stateVar, index] ()
   where
     accessVar = streamAccessorName sId
     functionName = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent accessVar) Nothing ()] ()) ()
-    index     = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral amount) Rust.Unsuffixed () ) ()
+    index     =  Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral amount) Rust.Unsuffixed () ) ()
+    stateVar = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent "state") Nothing ()] ()) ()
 
 -- Local expressions
 transExpr (Local {}) = error "not supported" -- TODO

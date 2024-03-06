@@ -4,6 +4,7 @@ module Copilot.Compile.Rust.CompileRust
   ( translateTriggers
   , mkStep
   , mkGenerators
+  , mkAccessDeclnR
   ) where
 
 import Copilot.Core ( Expr (..), Spec (..), Stream (..), Struct (..),
@@ -14,8 +15,9 @@ import qualified Language.Rust.Syntax as Rust
 import qualified Language.Rust.Data.Ident as Rust
 import Copilot.Compile.Rust.Type
 import Copilot.Compile.Rust.ExprRust
-import Copilot.Compile.Rust.Name (generatorName, streamName, indexName)
+import Copilot.Compile.Rust.Name (generatorName, streamName, indexName, streamAccessorName)
 import qualified Language.Rust.Syntax as Rust
+import Language.Rust.Data.Ident (mkIdent)
 -- import Copilot.Compile.Rust.Name (generatorOutputArgName)
 
 translateTriggers :: [Trigger] -> [Rust.Item ()]
@@ -141,7 +143,7 @@ mkStep spec@(Spec _ _ triggers _) =
             (tmpDcln, bufferUpdate, indexUpdate)
                 where
                 tmpDcln = Rust.Local (Rust.IdentP (Rust.ByValue Rust.Immutable) (Rust.mkIdent tmpVar) Nothing ()) (Just rustTy) (Just tmpExpr) [] ()
-                tmpExpr = Rust.Call [] (mkVariableReference $ generatorName sId) [] ()
+                tmpExpr = Rust.Call [] (mkVariableReference $ generatorName sId) [mkVariableReference "input", mkVariableReference "state"] ()
 
                 bufferUpdate = Rust.Semi
                     (Rust.Assign [] bufferVar (mkVariableReference tmpVar) ()) ()
@@ -156,3 +158,32 @@ mkStep spec@(Spec _ _ triggers _) =
                 newIndex = Rust.Binary [] Rust.RemOp incrementedIndex (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed ()) ()) ()
                 -- val      = C.Funcall (C.Ident $ generatorName sId) []
                 rustTy      = transTypeR ty
+
+
+-- | Define an accessor functions for the ring buffer associated with a stream.
+mkAccessDeclnR :: Stream -> Rust.Item ()
+mkAccessDeclnR (Stream sId buff _ ty) =
+  Rust.Fn
+    []
+    Rust.InheritedV
+    (Rust.mkIdent name)
+    (Rust.FnDecl [mkImmutableArg (mkRefType "MonitorState") "state", mkImmutableArg (mkType "usize") "index"]
+    (Just rustTy) False ())
+    Rust.Normal
+    Rust.NotConst
+    Rust.Rust
+    (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
+    (Rust.Block
+      [Rust.NoSemi expr ()]
+      Rust.Normal
+      ())
+    ()
+  
+  -- C.FunDef cTy name params [] [C.Return (Just expr)]
+  where
+    streamIndex = Rust.FieldAccess [] (mkVariableReference "state") (mkIdent (indexName sId)) ()
+    indexSum = Rust.Binary [] Rust.AddOp (mkVariableReference "index") streamIndex ()
+    index      = Rust.Binary [] Rust.RemOp indexSum (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed () ) ()) ()
+    expr = Rust.Index [] (Rust.FieldAccess [] (mkVariableReference "state") (mkIdent (streamName sId)) ()) index ()
+    rustTy        = transTypeR ty
+    name       = streamAccessorName sId
