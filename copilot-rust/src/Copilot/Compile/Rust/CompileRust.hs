@@ -41,6 +41,9 @@ mkType x = Rust.PathTy Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent 
 mkRefType :: String -> Rust.Ty ()
 mkRefType x = Rust.Rptr Nothing Rust.Immutable (mkType x) ()
 
+mkMutableRefType :: String -> Rust.Ty ()
+mkMutableRefType x = Rust.Rptr Nothing Rust.Mutable (mkType x) ()
+
 mkImmutableArg :: Rust.Ty () -> String -> Rust.Arg ()
 mkImmutableArg ty ident = Rust.Arg (Just (Rust.IdentP (Rust.ByValue Rust.Immutable) (Rust.mkIdent ident) Nothing ())) ty ()
 
@@ -109,9 +112,9 @@ mkTriggerRunnerExpr trigger@(Trigger name _ _) =
         Nothing
         ()
     where
-        triggerGuardCallExpr = Rust.Call [] (mkPathExpr [mkTriggerGuardName trigger]) [mkPathExpr ["input"], mkRef $ mkFieldAccessExpr (mkPathExpr ["self"]) "state"] ()
+        triggerGuardCallExpr = Rust.Call [] (mkPathExpr [mkTriggerGuardName trigger]) [mkPathExpr ["input"], mkPathExpr ["state"]] ()
         triggerCallExpr = Rust.Call [] (mkPathExpr [name]) triggerCallArgs ()
-        triggerCallArgs = map (\x -> Rust.Call [] (mkPathExpr [x]) [mkPathExpr ["input"], mkRef $ mkFieldAccessExpr (mkPathExpr ["self"]) "state"] ()) (mkTriggerArgNames trigger)
+        triggerCallArgs = map (\x -> Rust.Call [] (mkPathExpr [x]) [mkPathExpr ["input"], mkPathExpr ["state"]] ()) (mkTriggerArgNames trigger)
 
 
 mkVariableReference :: String -> Rust.Expr ()
@@ -123,7 +126,7 @@ mkStep spec@(Spec _ _ triggers _) =
         []
         Rust.InheritedV
         (Rust.mkIdent "internalStep")
-        (Rust.FnDecl [mkImmutableArg (mkRefType "MonitorInput") "input"] (Just $ Rust.TupTy [] ()) False ())
+        (Rust.FnDecl [mkImmutableArg (mkRefType "MonitorInput") "input", mkImmutableArg (mkMutableRefType "MonitorState") "state"] (Just $ Rust.TupTy [] ()) False ())
         Rust.Normal
         Rust.NotConst
         Rust.Rust
