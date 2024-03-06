@@ -125,12 +125,12 @@ mkStep spec@(Spec _ _ triggers _) =
     Rust.Fn
         []
         Rust.InheritedV
-        (Rust.mkIdent "internalStep")
-        (Rust.FnDecl [mkImmutableArg (mkRefType "MonitorInput") "input", mkImmutableArg (mkMutableRefType "MonitorState") "state", mkImmutableArg (mkRefType "T") "triggers"] (Just $ Rust.TupTy [] ()) False ())
+        (Rust.mkIdent "internal_step")
+        (Rust.FnDecl [mkImmutableArg (mkRefType "MonitorInput") "input", mkImmutableArg (mkMutableRefType "MonitorState") "state", mkImmutableArg (mkMutableRefType "T") "triggers"] (Just $ Rust.TupTy [] ()) False ())
         Rust.Normal
         Rust.NotConst
         Rust.Rust
-        (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
+        (Rust.Generics [] [Rust.TyParam [] (Rust.mkIdent "T") [Rust.TraitTyParamBound (Rust.PolyTraitRef [] (Rust.TraitRef (Rust.Path False [Rust.PathSegment (Rust.mkIdent "MonitorTriggers") Nothing ()] ())) ()) Rust.None ()] Nothing ()] (Rust.WhereClause [] ()) ())
         (Rust.Block (map (\x -> Rust.Semi (mkTriggerRunnerExpr x) ()) triggers ++ temps ++ buffUpdates ++ indexUpdates) Rust.Normal ())
         ()
     where
