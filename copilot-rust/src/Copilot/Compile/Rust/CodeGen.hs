@@ -10,6 +10,7 @@ module Copilot.Compile.Rust.CodeGen
     , translateTriggers
     , mkStep
     , mkAccessDeclnR
+    , mkPath
     )
   where
 
@@ -272,8 +273,11 @@ mkReturnBlock e = Rust.Block [ Rust.Semi (Rust.Ret [] (Just e) ()) () ] Rust.Nor
 mkIf :: Rust.Expr () -> Rust.Block () -> Rust.Expr ()
 mkIf predicate consequent = Rust.If [] predicate consequent Nothing ()
 
+mkPath :: [String] -> Rust.Path ()
+mkPath xs = Rust.Path False (map (\x -> Rust.PathSegment (mkIdent x) Nothing ()) xs) ()
+
 mkPathExpr :: [String] -> Rust.Expr ()
-mkPathExpr xs = Rust.PathExpr [] Nothing (Rust.Path False (map (\x -> Rust.PathSegment (mkIdent x) Nothing ()) xs) ()) ()
+mkPathExpr xs = Rust.PathExpr [] Nothing (mkPath xs) ()
 
 mkFieldAccessExpr :: Rust.Expr () -> String -> Rust.Expr ()
 mkFieldAccessExpr struct field = Rust.FieldAccess [] struct (mkIdent field) ()

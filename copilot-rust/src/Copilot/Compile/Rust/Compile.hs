@@ -26,12 +26,8 @@ import System.IO
 
 compile :: String -> String -> Spec -> IO ()
 compile dir name spec = do
-    writeFile (dir </> name ++ ".rs") $ rustHeader ++ rustCode ++ "\n\n" ++ rustFooter
+    writeFile (dir </> name ++ ".rs") $ rustCode ++ "\n\n" ++ rustFooter
     where
-      rustHeader = unlines
-        [ "use std::marker::PhantomData;"
-        , ""
-        ]
       rustCode = show $ Rust.pretty' $ compileRs name spec
       rustFooter = unlines
         [ "pub struct Monitor<'a, T: MonitorTriggers> {"
@@ -57,9 +53,10 @@ compileRs :: String -> Spec -> Rust.SourceFile ()
 compileRs name spec = Rust.SourceFile (Just name) attributes items
   where
     attributes = []
-    items = [trait, inputStruct, stateStruct, stateStructDefault] ++ accessDeclarations ++ generatorFuncs ++ triggerFuncs ++ [stepFunction]
+    items = [usePhantomDataItem, trait, inputStruct, stateStruct, stateStructDefault] ++ accessDeclarations ++ generatorFuncs ++ triggerFuncs ++ [stepFunction]
     trait = mkTriggerTrait triggers
 
+    usePhantomDataItem = Rust.Use [] Rust.InheritedV (Rust.UseTreeSimple (mkPath ["std", "marker", "PhantomData"]) Nothing ()) ()
     triggers = specTriggers spec
     streams = specStreams spec
     inputStruct = mkInputStruct (gatherExts streams triggers)
