@@ -79,6 +79,9 @@ mkReturnBlock e = Rust.Block [ Rust.Semi (Rust.Ret [] (Just e) ()) () ] Rust.Nor
 mkIf :: Rust.Expr () -> Rust.Block () -> Rust.Expr ()
 mkIf predicate consequent = Rust.If [] predicate consequent Nothing ()
 
+mkPathExpr :: String -> Rust.Expr ()
+mkPathExpr x = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent x) Nothing ()] ()) ()
+
 mkTriggerRunnerExpr :: Trigger -> Rust.Expr ()
 mkTriggerRunnerExpr trigger@(Trigger name _ _) =
     Rust.If
@@ -88,9 +91,9 @@ mkTriggerRunnerExpr trigger@(Trigger name _ _) =
         Nothing
         ()
     where
-        triggerGuardCallExpr = Rust.Call [] (Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent $ mkTriggerGuardName trigger) Nothing ()] ()) ()) [] ()
-        triggerCallExpr = Rust.Call [] (Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent name) Nothing ()] ()) ()) triggerCallArgs ()
-        triggerCallArgs = map (\x -> Rust.Call [] (Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent x) Nothing ()] ()) ()) [] ()) (mkTriggerArgNames trigger)
+        triggerGuardCallExpr = Rust.Call [] (mkPathExpr $ mkTriggerGuardName trigger) [] ()
+        triggerCallExpr = Rust.Call [] (mkPathExpr name) triggerCallArgs ()
+        triggerCallArgs = map (\x -> Rust.Call [] (mkPathExpr x) [mkPathExpr "input", mkPathExpr "state"] ()) (mkTriggerArgNames trigger)
 
 mkStep :: Spec -> Rust.Item ()
 mkStep (Spec _ _ triggers _) = 
