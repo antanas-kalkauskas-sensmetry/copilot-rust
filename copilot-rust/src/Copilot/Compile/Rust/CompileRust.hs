@@ -116,7 +116,7 @@ mkStep spec@(Spec _ _ triggers _) =
         []
         Rust.InheritedV
         (Rust.mkIdent "internalStep")
-        (Rust.FnDecl [mkMutableRefArg (mkType "MonitorInput") "input", mkMutableRefArg (mkType "MonitorState") "state"] (Just $ mkType "whatever") False ())
+        (Rust.FnDecl [mkImmutableRefArg (mkType "MonitorInput") "input", mkMutableRefArg (mkType "MonitorState") "state"] (Just $ mkType "whatever") False ())
         Rust.Normal
         Rust.NotConst
         Rust.Rust
