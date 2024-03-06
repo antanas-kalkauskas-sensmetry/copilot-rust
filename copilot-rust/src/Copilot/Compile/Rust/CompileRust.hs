@@ -113,7 +113,7 @@ mkTriggerRunnerExpr trigger@(Trigger name _ _) =
         ()
     where
         triggerGuardCallExpr = Rust.Call [] (mkPathExpr [mkTriggerGuardName trigger]) [mkPathExpr ["input"], mkPathExpr ["state"]] ()
-        triggerCallExpr = Rust.Call [] (mkPathExpr [name]) triggerCallArgs ()
+        triggerCallExpr = Rust.Call [] (mkFieldAccessExpr (mkPathExpr ["triggers"]) name) triggerCallArgs ()
         triggerCallArgs = map (\x -> Rust.Call [] (mkPathExpr [x]) [mkPathExpr ["input"], mkPathExpr ["state"]] ()) (mkTriggerArgNames trigger)
 
 
@@ -126,7 +126,7 @@ mkStep spec@(Spec _ _ triggers _) =
         []
         Rust.InheritedV
         (Rust.mkIdent "internalStep")
-        (Rust.FnDecl [mkImmutableArg (mkRefType "MonitorInput") "input", mkImmutableArg (mkMutableRefType "MonitorState") "state"] (Just $ Rust.TupTy [] ()) False ())
+        (Rust.FnDecl [mkImmutableArg (mkRefType "MonitorInput") "input", mkImmutableArg (mkMutableRefType "MonitorState") "state", mkImmutableArg (mkRefType "T") "triggers"] (Just $ Rust.TupTy [] ()) False ())
         Rust.Normal
         Rust.NotConst
         Rust.Rust
