@@ -24,10 +24,11 @@ import qualified Control.Exception.Base as Copilot.Compile.Rust
 import System.FilePath
 import System.IO
 
-compile :: String -> String -> Spec -> IO ()
-compile dir name spec = do
+compile :: String -> Spec -> IO ()
+compile name spec = do
     writeFile (dir </> name ++ ".rs") $ rustCode ++ "\n\n" ++ rustFooter
     where
+      dir = "."
       rustCode = show $ Rust.pretty' $ compileRs name spec
       rustFooter = unlines
         [ "pub struct Monitor<'a, T: MonitorTriggers> {"
