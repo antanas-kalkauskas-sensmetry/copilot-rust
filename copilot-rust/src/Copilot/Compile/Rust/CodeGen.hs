@@ -31,8 +31,8 @@ import Copilot.Compile.Rust.External ( External (..) )
 import Copilot.Compile.Rust.Name     ( argNames, argTempNames, generatorName,
                                       guardName, indexName, streamAccessorName,
                                       streamName )
-import Copilot.Compile.Rust.Settings ( CSettings, cSettingsStepFunctionName )
-import Copilot.Compile.Rust.Type     ( transType, transTypeR )
+import Copilot.Compile.Rust.Settings ( RustSettings, rustSettingsStepFunctionName )
+import Copilot.Compile.Rust.Type     ( transType )
 import GHC.Float ( float2Double )
 
 -- * Rust code generation functions
@@ -58,7 +58,7 @@ mkTriggerTraitHelper trigger =
     tempType (UExpr { uExprType = ty }) =
       case ty of
         Array ty' -> error "Arrays are not supported"
-        _         -> transTypeR ty
+        _         -> transType ty
 
 mkTriggerTrait :: [Trigger] -> Rust.Item ()
 mkTriggerTrait xs =
@@ -75,7 +75,7 @@ mkTriggerTrait xs =
 
 mkInputStructField :: External -> Rust.StructField ()
 mkInputStructField External{ extName = name, extType = ty} =
-  Rust.StructField (Just (mkIdent name)) Rust.PublicV (transTypeR ty) [] ()
+  Rust.StructField (Just (mkIdent name)) Rust.PublicV (transType ty) [] ()
 
 mkInputStruct :: [External] -> Rust.Item ()
 mkInputStruct xs = Rust.StructItem
@@ -92,7 +92,7 @@ mkInputStruct xs = Rust.StructItem
 
 mkBuffDeclnR :: Stream -> Rust.StructField ()
 mkBuffDeclnR (Stream sId buff _ ty) = 
-  Rust.StructField (Just (mkIdent (streamName sId))) Rust.InheritedV (Rust.Array (transTypeR ty) (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed ()) ()) ()) [] ()
+  Rust.StructField (Just (mkIdent (streamName sId))) Rust.InheritedV (Rust.Array (transType ty) (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed ()) ()) ()) [] ()
 
 mkIndexDeclnR :: Stream -> Rust.StructField ()
 mkIndexDeclnR (Stream sId buff _ ty) = 
@@ -201,7 +201,7 @@ mkUpdateGlobalsR (Stream sId buff _expr ty) =
       incrementedIndex = Rust.Binary [] Rust.AddOp indexVar (Rust.Lit [] (Rust.Int Rust.Dec 1 Rust.Unsuffixed ()) ()) ()
       newIndex = Rust.Binary [] Rust.RemOp incrementedIndex (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed ()) ()) ()
       -- val      = C.Funcall (C.Ident $ generatorName sId) []
-      rustTy      = transTypeR ty
+      rustTy      = transType ty
 
 translateTriggers :: [Trigger] -> [Rust.Item ()]
 translateTriggers = concatMap translateTrigger
@@ -259,7 +259,7 @@ mkTriggerArgFn name (UExpr ty e) =
         []
         Rust.InheritedV
         (mkIdent name)
-        (Rust.FnDecl [mkImmutableArg (mkRefType "MonitorInput") "input", mkImmutableArg (mkRefType "MonitorState") "state"] (Just $ transTypeR ty) False ())
+        (Rust.FnDecl [mkImmutableArg (mkRefType "MonitorInput") "input", mkImmutableArg (mkRefType "MonitorState") "state"] (Just $ transType ty) False ())
         Rust.Normal
         Rust.NotConst
         Rust.Rust
@@ -333,7 +333,7 @@ mkStep spec@(Spec _ _ triggers _) =
                 incrementedIndex = Rust.Binary [] Rust.AddOp indexVar (Rust.Lit [] (Rust.Int Rust.Dec 1 Rust.Unsuffixed ()) ()) ()
                 newIndex = Rust.Binary [] Rust.RemOp incrementedIndex (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed ()) ()) ()
                 -- val      = C.Funcall (C.Ident $ generatorName sId) []
-                rustTy      = transTypeR ty
+                rustTy      = transType ty
 
 
 -- | Define an accessor functions for the ring buffer associated with a stream.
@@ -361,5 +361,5 @@ mkAccessDeclnR (Stream sId buff _ ty) =
     indexSum = Rust.Binary [] Rust.AddOp (mkVariableReference "index") streamIndex ()
     index      = Rust.Binary [] Rust.RemOp indexSum (Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral $ length buff) Rust.Unsuffixed () ) ()) ()
     expr = Rust.Index [] (Rust.FieldAccess [] (mkVariableReference "state") (mkIdent (streamName sId)) ()) index ()
-    rustTy        = transTypeR ty
+    rustTy        = transType ty
     name       = streamAccessorName sId

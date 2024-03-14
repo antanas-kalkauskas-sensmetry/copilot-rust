@@ -17,7 +17,7 @@ import Copilot.Core ( Expr (..), Field (..), Op1 (..), Op2 (..), Op3 (..),
 
 -- Internal imports
 import Copilot.Compile.Rust.Name
-import Copilot.Compile.Rust.Type  ( transLocalVarDeclType, transTypeName, transTypeR )
+import Copilot.Compile.Rust.Type  ( transLocalVarDeclType, transType )
 
 -- import qualified Core as Copilot
 import GHC.Float (float2Double)
@@ -84,7 +84,7 @@ transExpr (Op1 (Acosh _) _) = error "not supported" -- TODO
 transExpr (Op1 (Ceiling _) _) = error "not supported" -- TODO
 transExpr (Op1 (Floor _) _) = error "not supported" -- TODO
 transExpr (Op1 (BwNot _) _) = error "not supported" -- TODO
-transExpr (Op1 (Cast ty1 ty2) expr) = Rust.Cast [] (transExpr expr) (transTypeR ty2) ()
+transExpr (Op1 (Cast ty1 ty2) expr) = Rust.Cast [] (transExpr expr) (transType ty2) ()
 transExpr (Op1 (GetField {}) _) = error "not supported" -- TODO
 
 -- Op2 expressions
