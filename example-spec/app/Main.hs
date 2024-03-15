@@ -5,6 +5,7 @@
 module Main where
 
 import Language.Copilot
+import qualified Language.Copilot as Copilot
 import Copilot.Compile.Rust
 
 import Prelude hiding ((>), (<), div)
@@ -20,11 +21,19 @@ temp = extern "temperature" Nothing
 ctemp :: Stream Float
 ctemp = (unsafeCast temp) * (150.0 / 255.0) - 50.0
 
+window :: Int
+window = 5
+
+avgTemp :: Stream Float
+avgTemp = Copilot.sum window
+  (replicate window 19.5 Copilot.++ ctemp) / fromIntegral window
+
 spec = do
   -- Triggers that fire when the ctemp is too low or too high,
   -- pass the current ctemp as an argument.
   trigger "heaton"  (ctemp < 18.0) [arg ctemp]
   trigger "heatoff" (ctemp > 21.0) [arg ctemp]
+  trigger "temperature_warning" (avgTemp > 21.0 Copilot.|| avgTemp < 18.0) [arg ctemp]
 
 -- Compile the spec
 main = reify spec >>= compile "heater"
