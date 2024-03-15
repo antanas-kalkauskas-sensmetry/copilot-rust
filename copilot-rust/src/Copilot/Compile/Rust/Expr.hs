@@ -106,9 +106,8 @@ transExpr (Op3 (Mux _) predicate consequent alternative) =
 -- Label expressions
 transExpr (Label _ _ e) = transExpr e
 
-{- | Transform a Copilot Core literal, based on its value and type, into a Rust
- literal.
--}
+-- | Transform a Copilot Core literal, based on its value and type, into a Rust
+-- literal.
 constTy :: Type a -> a -> Rust.Expr ()
 constTy Bool x = Rust.Lit [] (Rust.Bool x Rust.Unsuffixed ()) ()
 constTy Int8 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.I8 ()) ()
