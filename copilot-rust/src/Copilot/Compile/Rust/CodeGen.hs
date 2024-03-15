@@ -15,9 +15,6 @@ module Copilot.Compile.Rust.CodeGen
   where
 
 -- External imports
-import           Control.Monad.State ( runState )
-import           Data.List           ( unzip4 )
-import qualified Data.List.NonEmpty  as NonEmpty
 import qualified Language.Rust.Syntax as Rust
 import Language.Rust.Data.Ident
 
@@ -26,14 +23,12 @@ import Copilot.Core ( Expr (..), Id, Stream (..), Struct (..), Trigger (..),
                       Type (..), UExpr (..), Value (..), fieldName, typeSize, Spec (..) )
 
 -- Internal imports
-import Copilot.Compile.Rust.Expr     ( transExpr )
+import Copilot.Compile.Rust.Expr     ( transExpr, constArray )
 import Copilot.Compile.Rust.External ( External (..) )
 import Copilot.Compile.Rust.Name     ( argNames, argTempNames, generatorName,
                                       guardName, indexName, streamAccessorName,
                                       streamName )
-import Copilot.Compile.Rust.Settings ( RustSettings, rustSettingsStepFunctionName )
 import Copilot.Compile.Rust.Type     ( transType )
-import GHC.Float ( float2Double )
 
 -- * Rust code generation functions
 
@@ -44,21 +39,18 @@ mkTriggerTraitHelper trigger =
     (mkIdent (triggerName trigger))
     (Rust.Generics [] [] (Rust.WhereClause [] ()) ())
     (Rust.MethodSig Rust.Normal Rust.NotConst Rust.Rust
-                (Rust.FnDecl (Rust.SelfRegion Nothing Rust.Mutable () : methods)
+                (Rust.FnDecl (Rust.SelfRegion Nothing Rust.Mutable () : arguments)
                         Nothing
                         False ())) 
     Nothing
     ()
   where
-    methods = map mkMethod argsPrep
-    mkMethod (index, ty) = Rust.Arg (Just (Rust.IdentP (Rust.ByValue Rust.Immutable) (mkIdent $ "arg_" ++ show index) Nothing ())) ty ()
-    argsPrep = zip [0, 1..] (map tempType (triggerArgs trigger))
+    arguments = map mkArgument argsAux
+    mkArgument (triggerArgName, ty) = Rust.Arg (Just (Rust.IdentP (Rust.ByValue Rust.Immutable) (mkIdent triggerArgName) Nothing ())) ty ()
+    argsAux = zip (argNames (triggerName trigger)) (map tempType (triggerArgs trigger))
 
     tempType :: UExpr -> Rust.Ty ()
-    tempType (UExpr { uExprType = ty }) =
-      case ty of
-        Array ty' -> error "Arrays are not supported"
-        _         -> transType ty
+    tempType (UExpr { uExprType = ty }) = transType ty
 
 mkTriggerTrait :: [Trigger] -> Rust.Item ()
 mkTriggerTrait xs =
@@ -148,26 +140,9 @@ mkStateStructDefault streams =
     initIndices = map mkInitIndexField streams
     initBuffers = map mkInitBufferField streams
 
-    mkInitIndexField (Stream sId buff _ ty) = Rust.Field (mkIdent (indexName sId )) (Just $ Rust.Lit [] (Rust.Int Rust.Dec 0 Rust.Unsuffixed ()) ()) ()
-    mkInitBufferField (Stream sId buff expr ty) = Rust.Field (mkIdent (streamName sId)) (Just $ mkArrayLiteral ty buff) ()
-    -- TODO: move this to Expr and complete it
-    mkArrayLiteral :: Type a -> [a] -> Rust.Expr ()
-    mkArrayLiteral Float xs =
-      Rust.Vec
-      []
-      (map (\x -> Rust.Lit [] (Rust.Float (float2Double x) Rust.Unsuffixed ()) ()) xs)
-      ()
-    mkArrayLiteral Double xs =
-      Rust.Vec
-      []
-      (map (\x -> Rust.Lit [] (Rust.Float x Rust.Unsuffixed ()) ()) xs)
-      ()
-    mkArrayLiteral Int32 xs =
-      Rust.Vec
-      []
-      (map (\x -> Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.Unsuffixed ()) ()) xs)
-      ()
-    mkArrayLiteral _ _ = error "not implemented" -- TODO
+    mkInitIndexField (Stream sId _ _ _) = Rust.Field (mkIdent (indexName sId )) (Just $ Rust.Lit [] (Rust.Int Rust.Dec 0 Rust.Unsuffixed ()) ()) ()
+    mkInitBufferField (Stream sId buff _ ty) = Rust.Field (mkIdent (streamName sId)) (Just $ constArray ty buff) ()
+
 
 
 mkVariableReference :: String -> Rust.Expr ()
@@ -209,7 +184,7 @@ mkMutableArg :: Rust.Ty () -> String -> Rust.Arg ()
 mkMutableArg ty ident = Rust.Arg (Just (Rust.IdentP (Rust.ByValue Rust.Mutable) (mkIdent ident) Nothing ())) ty ()
 
 mkTriggerGuardName :: Trigger -> String
-mkTriggerGuardName (Trigger name _ _) = name ++ "_guard"
+mkTriggerGuardName (Trigger name _ _) = guardName name
 
 mkTriggerArgNames :: Trigger -> [String]
 mkTriggerArgNames (Trigger name _ args) =
@@ -273,7 +248,7 @@ mkTriggerRunnerExpr trigger@(Trigger name _ _) =
         Nothing
         ()
     where
-        triggerGuardCallExpr = Rust.Call [] (mkPathExpr [mkTriggerGuardName trigger]) [mkPathExpr ["input"], mkPathExpr ["state"]] ()
+        triggerGuardCallExpr = Rust.Call [] (mkPathExpr [guardName name]) [mkPathExpr ["input"], mkPathExpr ["state"]] ()
         triggerCallExpr = Rust.Call [] (mkFieldAccessExpr (mkPathExpr ["triggers"]) name) triggerCallArgs ()
         triggerCallArgs = map (\x -> Rust.Call [] (mkPathExpr [x]) [mkPathExpr ["input"], mkPathExpr ["state"]] ()) (mkTriggerArgNames trigger)
 
@@ -332,8 +307,7 @@ mkAccessDecln (Stream sId buff _ ty) =
       Rust.Normal
       ())
     ()
-  
-  -- C.FunDef cTy name params [] [C.Return (Just expr)]
+
   where
     streamIndex = Rust.FieldAccess [] (mkVariableReference "state") (mkIdent (indexName sId)) ()
     indexSum = Rust.Binary [] Rust.AddOp (mkVariableReference "index") streamIndex ()

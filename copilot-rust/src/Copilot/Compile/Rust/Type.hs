@@ -8,13 +8,13 @@ module Copilot.Compile.Rust.Type
   where
 
 -- External imports
-import qualified Language.Rust.Syntax as R
+import qualified Language.Rust.Syntax as Rust
 
 -- Internal imports: Copilot
-import Copilot.Core ( Type (..), typeLength, typeName )
+import Copilot.Core ( Type (..) )
 
 -- | Translate a Copilot type to a Rust type.
-transType :: Type a -> R.Ty ()
+transType :: Type a -> Rust.Ty ()
 transType ty = case ty of
   Bool     -> mkTypeDef "bool"
   Int8     -> mkTypeDef "i8"
@@ -30,7 +30,7 @@ transType ty = case ty of
   Array _  -> error "Arrays are not implemented yet"
   Struct _ -> error "Structs are not implemented yet"
   where
-   mkTypeDef name = R.PathTy Nothing (R.Path False [R.PathSegment name Nothing ()] ()) ()
+   mkTypeDef name = Rust.PathTy Nothing (Rust.Path False [Rust.PathSegment name Nothing ()] ()) ()
 
 -- | Translate a Copilot type to a valid (local) variable declaration Rust type.
 --
@@ -38,6 +38,6 @@ transType ty = case ty of
 -- array holds. This special case is needed when the type is used for a local
 -- variable declaration. We treat global variables differently (we generate
 -- list initializers).
-transLocalVarDeclType :: Type a -> R.Ty ()
+transLocalVarDeclType :: Type a -> Rust.Ty ()
 transLocalVarDeclType (Array _) = error "Arrays are not implemented yet"
 transLocalVarDeclType ty        = transType ty

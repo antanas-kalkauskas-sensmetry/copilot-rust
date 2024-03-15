@@ -2,6 +2,7 @@
 
 module Copilot.Compile.Rust.Compile
   ( compile
+  , compileWith
   ) where
 
 import Copilot.Core ( Expr (..), Spec (..), Stream (..), Struct (..),
@@ -9,34 +10,35 @@ import Copilot.Core ( Expr (..), Spec (..), Stream (..), Struct (..),
                       Value (..) )
 -- import qualified Core.Spec as Copilot
 import qualified Language.Rust.Syntax as Rust
-import qualified Language.Rust.Data.Ident as Rust
-import Copilot.Compile.Rust.Name
-import Copilot.Compile.Rust.Type
-import Copilot.Compile.Rust.Expr
+import Copilot.Compile.Rust.Name ()
+import Copilot.Compile.Rust.Type ()
+import Copilot.Compile.Rust.Expr ()
 import Copilot.Compile.Rust.External
 import Copilot.Compile.Rust.CodeGen
-import qualified Language.Rust.Syntax as Rust
 import qualified Language.Rust.Pretty as Rust
-import Language.Rust.Data.Ident (mkIdent)
-import qualified Control.Exception.Base as Copilot.Compile.Rust
--- import Copilot.Compile.Rust.Name (generatorOutputArgName)
 
 import System.FilePath
-import System.IO
+import Copilot.Compile.Rust.Settings (mkDefaultRustSettings, RustSettings (rustMonitorStructName, rustSettingsOutputDirectory))
+import System.Directory (createDirectoryIfMissing)
+
 
 compile :: String -> Spec -> IO ()
-compile name spec = do
+compile = compileWith mkDefaultRustSettings
+
+compileWith :: RustSettings -> String -> Spec -> IO ()
+compileWith rustSettings name spec = do
+    let dir = rustSettingsOutputDirectory rustSettings
+    createDirectoryIfMissing True dir
     writeFile (dir </> name ++ ".rs") $ rustCode ++ "\n\n" ++ rustFooter
     where
-      dir = "."
       rustCode = show $ Rust.pretty' $ compileRs name spec
       rustFooter = unlines
-        [ "pub struct Monitor<'a, T: MonitorTriggers> {"
+        [ "pub struct " ++ structName ++ "<'a, T: MonitorTriggers> {"
         , "    state: MonitorState,"
         , "    phantom : PhantomData<&'a T>"
         , "}"
         , ""
-        , "impl<T: MonitorTriggers> Monitor<'_, T> {"
+        , "impl<T: MonitorTriggers> " ++ structName ++ "<'_, T> {"
         , "    pub fn new() -> Self {"
         , "        Monitor {"
         , "            state: MonitorState::default(),"
@@ -49,6 +51,7 @@ compile name spec = do
         , "    }"
         , "}"
         ]
+      structName = rustMonitorStructName rustSettings
 
 compileRs :: String -> Spec -> Rust.SourceFile ()
 compileRs name spec = Rust.SourceFile (Just name) attributes items
@@ -69,7 +72,6 @@ compileRs name spec = Rust.SourceFile (Just name) attributes items
     stateStruct = mkStateStruct streams
     stateStructDefault = mkStateStructDefault streams
     accessDeclarations = map mkAccessDecln streams
-    -- monitorStruct = mkMonitorStruct
     stepFunction = mkStep spec
     triggerFuncs = translateTriggers triggers
     generatorFuncs = mkGenerators streams

@@ -7,10 +7,10 @@ module Copilot.Compile.Rust.Settings
 
 -- | Settings used to customize the code generated.
 data RustSettings = RustSettings
-  { rustSettingsStepFunctionName :: String
+  { rustMonitorStructName :: String
   , rustSettingsOutputDirectory  :: FilePath
   }
 
 -- | Default settings with a step function called @step@.
 mkDefaultRustSettings :: RustSettings
-mkDefaultRustSettings = RustSettings "step" "."
+mkDefaultRustSettings = RustSettings "Monitor" "."

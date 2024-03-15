@@ -2,7 +2,7 @@
 
 module Copilot.Compile.Rust.Expr
     ( transExpr
-    -- , constArray
+    , constArray
     )
   where
 
@@ -27,19 +27,7 @@ import qualified Language.Rust.Data.Ident as Rust
 transExpr :: Expr a -> Rust.Expr ()
 
 -- Const expressions
-transExpr (Const Bool x) = Rust.Lit [] (Rust.Bool x Rust.Unsuffixed ()) ()
-transExpr (Const Int8 x) = translateIntLiteral x
-transExpr (Const Int16 x) = translateIntLiteral x
-transExpr (Const Int32 x) = translateIntLiteral x
-transExpr (Const Int64 x) = translateIntLiteral x
-transExpr (Const Word8 x) = translateIntLiteral x
-transExpr (Const Word16 x) = translateIntLiteral x
-transExpr (Const Word32 x) = translateIntLiteral x
-transExpr (Const Word64 x) = translateIntLiteral x
-transExpr (Const Float x) = Rust.Lit [] (Rust.Float (float2Double x) Rust.Unsuffixed ()) ()
-transExpr (Const Double x) = Rust.Lit [] (Rust.Float x Rust.Unsuffixed ()) ()
-transExpr (Const (Array _) _) = error "not supported" -- TODO
-transExpr (Const (Struct _) _) = error "not supported" -- TODO
+transExpr (Const ty x) = constTy ty x
 
 transExpr (Drop _ amount sId) =
   Rust.Call [] functionName [stateVar, index] ()
@@ -122,6 +110,33 @@ transExpr (Op3 (Mux _) predicate consequent alternative) =
 
 -- Label expressions
 transExpr (Label _ _ e) = transExpr e
+
+-- | Transform a Copilot Core literal, based on its value and type, into a Rust
+-- literal.
+constTy :: Type a -> a -> Rust.Expr ()
+constTy Bool x = Rust.Lit [] (Rust.Bool x Rust.Unsuffixed ()) ()
+constTy Int8 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.I8 ()) ()
+constTy Int16 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.I16 ()) ()
+constTy Int32 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.I32 ()) ()
+constTy Int64 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.I64 ()) ()
+constTy Word8 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.U8 ()) ()
+constTy Word16 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.U16 ()) ()
+constTy Word32 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.U32 ()) ()
+constTy Word64 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.U64 ()) ()
+constTy Float x = Rust.Lit [] (Rust.Float (float2Double x) Rust.F32 ()) ()
+constTy Double x = Rust.Lit [] (Rust.Float x Rust.F64 ()) ()
+constTy (Struct _) _ = error "not supported"
+constTy (Array _) _ = error "not supported"
+
+-- | Transform a Copilot Array, based on the element values and their type,
+-- into a list of Rust initializer values.
+constArray :: Type a -> [a] -> Rust.Expr ()
+constArray  ty xs =
+  Rust.Vec
+  []
+  (map (constTy ty) xs)
+  ()
+
 
 -- Helpers
 translateIntLiteral :: Integral a => a -> Rust.Expr ()
