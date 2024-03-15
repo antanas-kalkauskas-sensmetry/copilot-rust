@@ -7,8 +7,6 @@ module Copilot.Compile.Rust.Expr
   where
 
 -- External imports
-import           Control.Monad.State ( State, modify )
-import qualified Data.List.NonEmpty  as NonEmpty
 
 -- Internal imports: Copilot
 import Copilot.Core ( Expr (..), Field (..), Op1 (..), Op2 (..), Op3 (..),
@@ -17,34 +15,31 @@ import Copilot.Core ( Expr (..), Field (..), Op1 (..), Op2 (..), Op3 (..),
 
 -- Internal imports
 import Copilot.Compile.Rust.Name
-import Copilot.Compile.Rust.Type  ( transLocalVarDeclType, transType )
+import Copilot.Compile.Rust.Type (transLocalVarDeclType, transType)
 
 -- import qualified Core as Copilot
 import GHC.Float (float2Double)
-import qualified Language.Rust.Syntax as Rust
 import qualified Language.Rust.Data.Ident as Rust
+import qualified Language.Rust.Syntax as Rust
 
 transExpr :: Expr a -> Rust.Expr ()
-
 -- Const expressions
 transExpr (Const ty x) = constTy ty x
-
 transExpr (Drop _ amount sId) =
-  Rust.Call [] functionName [stateVar, index] ()
+    Rust.Call [] functionName [stateVar, index] ()
   where
     accessVar = streamAccessorName sId
     functionName = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent accessVar) Nothing ()] ()) ()
-    index     =  Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral amount) Rust.Unsuffixed () ) ()
+    index = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral amount) Rust.Unsuffixed ()) ()
     stateVar = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent "state") Nothing ()] ()) ()
 
 -- Local expressions
-transExpr (Local {}) = error "not supported" -- TODO
+transExpr (Local{}) = error "not supported" -- TODO
 
 -- Var expressions
 transExpr (Var _ name) = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent name) Nothing ()] ()) ()
 
 -- ExternVar expressions
--- transExpr (ExternVar {}) = error "not supported" -- TODO
 transExpr (ExternVar _ name _) = Rust.FieldAccess [] inputStruct (Rust.mkIdent name) ()
   where
     inputStruct = Rust.PathExpr [] Nothing (Rust.Path False [Rust.PathSegment (Rust.mkIdent "input") Nothing ()] ()) ()
@@ -73,7 +68,7 @@ transExpr (Op1 (Ceiling _) _) = error "not supported" -- TODO
 transExpr (Op1 (Floor _) _) = error "not supported" -- TODO
 transExpr (Op1 (BwNot _) _) = error "not supported" -- TODO
 transExpr (Op1 (Cast ty1 ty2) expr) = Rust.Cast [] (transExpr expr) (transType ty2) ()
-transExpr (Op1 (GetField {}) _) = error "not supported" -- TODO
+transExpr (Op1 (GetField{}) _) = error "not supported" -- TODO
 
 -- Op2 expressions
 transExpr (Op2 And x y) = translateBinaryOp x y Rust.AndOp
@@ -102,17 +97,18 @@ transExpr (Op2 (Index _) x y) = Rust.Index [] (transExpr x) (transExpr y) ()
 
 -- Op3 expressions
 transExpr (Op3 (Mux _) predicate consequent alternative) =
-    Rust.If []
+    Rust.If
+        []
         (transExpr predicate)
-        (Rust.Block [ Rust.NoSemi (transExpr consequent) () ] Rust.Normal ())
-        (Just (Rust.BlockExpr [] (Rust.Block [ Rust.NoSemi (transExpr alternative) () ] Rust.Normal ()) ()))
+        (Rust.Block [Rust.NoSemi (transExpr consequent) ()] Rust.Normal ())
+        (Just (Rust.BlockExpr [] (Rust.Block [Rust.NoSemi (transExpr alternative) ()] Rust.Normal ()) ()))
         ()
-
 -- Label expressions
 transExpr (Label _ _ e) = transExpr e
 
--- | Transform a Copilot Core literal, based on its value and type, into a Rust
--- literal.
+{- | Transform a Copilot Core literal, based on its value and type, into a Rust
+ literal.
+-}
 constTy :: Type a -> a -> Rust.Expr ()
 constTy Bool x = Rust.Lit [] (Rust.Bool x Rust.Unsuffixed ()) ()
 constTy Int8 x = Rust.Lit [] (Rust.Int Rust.Dec (fromIntegral x) Rust.I8 ()) ()
@@ -131,12 +127,11 @@ constTy (Array _) _ = error "not supported"
 -- | Transform a Copilot Array, based on the element values and their type,
 -- into a list of Rust initializer values.
 constArray :: Type a -> [a] -> Rust.Expr ()
-constArray  ty xs =
-  Rust.Vec
-  []
-  (map (constTy ty) xs)
-  ()
-
+constArray ty xs =
+    Rust.Vec
+        []
+        (map (constTy ty) xs)
+        ()
 
 -- Helpers
 translateIntLiteral :: Integral a => a -> Rust.Expr ()
