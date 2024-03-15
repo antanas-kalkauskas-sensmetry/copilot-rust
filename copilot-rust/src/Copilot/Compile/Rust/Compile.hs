@@ -54,17 +54,22 @@ compileRs :: String -> Spec -> Rust.SourceFile ()
 compileRs name spec = Rust.SourceFile (Just name) attributes items
   where
     attributes = []
-    items = [usePhantomDataItem, trait, inputStruct, stateStruct, stateStructDefault] ++ accessDeclarations ++ generatorFuncs ++ triggerFuncs ++ [stepFunction]
-    trait = mkTriggerTrait triggers
+    items =
+      [usePhantomDataItem, trait, inputStruct, stateStruct, stateStructDefault] 
+      ++ accessDeclarations
+      ++ generatorFuncs
+      ++ triggerFuncs
+      ++ [stepFunction]
 
+    trait = mkTriggerTrait triggers
     usePhantomDataItem = Rust.Use [] Rust.InheritedV (Rust.UseTreeSimple (mkPath ["std", "marker", "PhantomData"]) Nothing ()) ()
     triggers = specTriggers spec
     streams = specStreams spec
     inputStruct = mkInputStruct (gatherExts streams triggers)
     stateStruct = mkStateStruct streams
     stateStructDefault = mkStateStructDefault streams
-    accessDeclarations = map Copilot.Compile.Rust.CodeGen.mkAccessDeclnR streams
+    accessDeclarations = map mkAccessDecln streams
     -- monitorStruct = mkMonitorStruct
-    stepFunction = Copilot.Compile.Rust.CodeGen.mkStep spec
-    triggerFuncs = Copilot.Compile.Rust.CodeGen.translateTriggers triggers
-    generatorFuncs = Copilot.Compile.Rust.CodeGen.mkGenerators streams
+    stepFunction = mkStep spec
+    triggerFuncs = translateTriggers triggers
+    generatorFuncs = mkGenerators streams

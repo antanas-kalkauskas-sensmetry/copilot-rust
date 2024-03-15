@@ -2,7 +2,6 @@
 module Copilot.Compile.Rust.Settings
     ( RustSettings(..)
     , mkDefaultRustSettings
-    , 
     )
   where
 
