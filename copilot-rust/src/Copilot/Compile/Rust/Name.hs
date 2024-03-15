@@ -1,4 +1,4 @@
--- | Naming of variables and functions in C.
+-- | Naming of variables and functions in Rust.
 module Copilot.Compile.Rust.Name
     ( argNames
     , argTempNames
@@ -15,7 +15,7 @@ module Copilot.Compile.Rust.Name
 -- External imports: Copilot
 import Copilot.Core (Id)
 
--- | Turn a stream id into a suitable C variable name.
+-- | Turn a stream id into a suitable Rust variable name.
 streamName :: Id -> String
 streamName sId = "s" ++ show sId
 

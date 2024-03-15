@@ -1,11 +1,10 @@
 -- | Compile Copilot specifications to Rust code.
 module Copilot.Compile.Rust
-  ( compile
+  ( mkDefaultRustSettings
+  , compile
   , compileWith
-  , CSettings(..)
-  , mkDefaultCSettings
   ) where
 
 -- Internal imports
 import Copilot.Compile.Rust.Compile  ( compile, compileWith )
-import Copilot.Compile.Rust.Settings ( CSettings (..), mkDefaultCSettings )
+import Copilot.Compile.Rust.Settings ( RustSettings (..), mkDefaultRustSettings )

@@ -6,4 +6,3 @@ source-repository-package
 packages:
     copilot-rust
     example-spec
-    example-ast-construction
