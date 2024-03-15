@@ -33,7 +33,7 @@ spec = do
   -- pass the current ctemp as an argument.
   trigger "heaton"  (ctemp < 18.0) [arg ctemp]
   trigger "heatoff" (ctemp > 21.0) [arg ctemp]
-  trigger "temperature_warning" (avgTemp > 21.0 Copilot.|| avgTemp < 18.0) [arg ctemp]
+  trigger "temperature_warning" (avgTemp > 21.0 Copilot.|| avgTemp < 18.0) [arg avgTemp]
 
 -- Compile the spec
 main = reify spec >>= compile "heater"

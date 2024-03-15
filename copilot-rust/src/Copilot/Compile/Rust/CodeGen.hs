@@ -238,10 +238,10 @@ translateTriggers :: [Trigger] -> [Rust.Item ()]
 translateTriggers = concatMap translateTrigger
 
 translateTrigger :: Trigger -> [Rust.Item ()]
-translateTrigger trigger@(Trigger _ _ args) = guardFn : triggerFns
+translateTrigger trigger@(Trigger name _ args) = guardFn : triggerFns
   where
     guardFn = mkTriggerGuardFn trigger
-    triggerFns = zipWith mkTriggerArgFn (mkTriggerArgNames trigger) args
+    triggerFns = zipWith mkTriggerArgFn (argNames name) args
 
 mkGenerators :: [Stream] -> [Rust.Item ()]
 mkGenerators = concatMap mkGenerator
@@ -262,13 +262,6 @@ mkMutableArg ty ident = Rust.Arg (Just (Rust.IdentP (Rust.ByValue Rust.Mutable) 
 
 mkTriggerGuardName :: Trigger -> String
 mkTriggerGuardName (Trigger name _ _) = guardName name
-
-mkTriggerArgNames :: Trigger -> [String]
-mkTriggerArgNames (Trigger name _ args) =
-    zipWith
-        (++)
-        (replicate (length args) name)
-        (map (\x -> "_arg" ++ show x) [0 .. length args])
 
 mkTriggerGuardFn :: Trigger -> Rust.Item ()
 mkTriggerGuardFn trigger@(Trigger _ guard _) =
@@ -331,7 +324,7 @@ mkRef :: Rust.Expr () -> Rust.Expr ()
 mkRef e = Rust.AddrOf [] Rust.Immutable e ()
 
 mkTriggerRunnerExpr :: Trigger -> Rust.Expr ()
-mkTriggerRunnerExpr trigger@(Trigger name _ _) =
+mkTriggerRunnerExpr trigger@(Trigger name _ args) =
     Rust.If
         []
         triggerGuardCallExpr
@@ -341,7 +334,7 @@ mkTriggerRunnerExpr trigger@(Trigger name _ _) =
   where
     triggerGuardCallExpr = Rust.Call [] (mkPathExpr [guardName name]) [mkPathExpr ["input"], mkPathExpr ["state"]] ()
     triggerCallExpr = Rust.Call [] (mkFieldAccessExpr (mkPathExpr ["triggers"]) name) triggerCallArgs ()
-    triggerCallArgs = map mkTriggerCallArg (mkTriggerArgNames trigger)
+    triggerCallArgs = map mkTriggerCallArg (take (length args) (argNames name))
     mkTriggerCallArg x = Rust.Call [] (mkPathExpr [x]) [mkPathExpr ["input"], mkPathExpr ["state"]] ()
 
 mkStep :: Spec -> Rust.Item ()
@@ -382,9 +375,10 @@ mkStep spec@(Spec _ _ triggers _) =
             (Rust.WhereClause [] ())
             ()
         )
-        (Rust.Block (map (\x -> Rust.Semi (mkTriggerRunnerExpr x) ()) triggers ++ temps ++ buffUpdates ++ indexUpdates) Rust.Normal ())
+        (Rust.Block (triggerRunnerExprs ++ temps ++ buffUpdates ++ indexUpdates) Rust.Normal ())
         ()
   where
+    triggerRunnerExprs = map (\x -> Rust.Semi (mkTriggerRunnerExpr x) ()) triggers
     (temps, buffUpdates, indexUpdates) = unzip3 (map mkUpdateGlobals streams)
     streams = specStreams spec
     mkUpdateGlobals :: Stream -> (Rust.Stmt (), Rust.Stmt (), Rust.Stmt ())
